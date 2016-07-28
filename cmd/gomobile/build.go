@@ -125,7 +125,8 @@ func runBuild(cmd *command) (err error) {
 	}
 
 	if !nmpkgs["golang.org/x/mobile/app"] {
-		return fmt.Errorf(`%s does not import "golang.org/x/mobile/app"`, pkg.ImportPath)
+		//fmt.Errorf(`%s does not import "golang.org/x/mobile/app"`, pkg.ImportPath)
+		return nil
 	}
 
 	return nil
