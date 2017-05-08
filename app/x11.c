@@ -110,7 +110,7 @@ createWindow(void) {
 		exit(1);
 	}
 	eglBindAPI(EGL_OPENGL_ES_API);
-	win = new_window(x_dpy, e_dpy, 1080/2, 1920/2, &e_ctx, &e_surf);
+	win = new_window(x_dpy, e_dpy, 1280, 720, &e_ctx, &e_surf);
 
 	wm_delete_window = XInternAtom(x_dpy, "WM_DELETE_WINDOW", True);
 	if (wm_delete_window != None) {
