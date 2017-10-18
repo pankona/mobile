@@ -395,6 +395,8 @@ static int numI = 0;
 	XCTAssertNil(i, @"NewNullInterface() returned %p; expected nil", i);
 	TestpkgS *s = TestpkgNewNullStruct();
 	XCTAssertNil(s, @"NewNullStruct() returned %p; expected nil", s);
+	TestpkgIssue20330 *nullArger = TestpkgNewIssue20330();
+	XCTAssertTrue([nullArger callWithNull:nil], @"Issue20330.CallWithNull failed");
 }
 
 - (void)testReturnsError {
@@ -451,4 +453,28 @@ static int numI = 0;
 - (void)testTags {
 	XCTAssertEqual(42, TestpkgTaggedConst, @"Tagged const must exist");
 }
+
+- (void)testConstructors {
+	id<TestpkgInterface> i = [[TestpkgConcrete alloc] init];
+	[i f];
+
+	TestpkgS2 *s = [[TestpkgS2 alloc] init:1 y:2];
+	XCTAssertEqual(3.0, [s sum]);
+	XCTAssertEqualObjects(@"gostring", [s tryTwoStrings:@"go" second:@"string"]);
+
+	TestpkgS3 *s3 __attribute__((unused)) = [[TestpkgS3 alloc] init];
+
+	TestpkgS4 *s4 = [[TestpkgS4 alloc] initWithInt:123];
+	XCTAssertEqual(123, s4.i);
+
+	s4 = [[TestpkgS4 alloc] initWithFloat: 123.456];
+	XCTAssertEqual(123, s4.i);
+
+	s4 = [[TestpkgS4 alloc] initWithBoolAndError: false];
+	XCTAssertEqual(0, s4.i);
+
+	s4 = [[TestpkgS4 alloc] initWithBoolAndError: true];
+	XCTAssertEqual(s4, NULL);
+}
+
 @end

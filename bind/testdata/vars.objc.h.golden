@@ -14,14 +14,15 @@
 @protocol VarsI;
 @class VarsI;
 
-@interface VarsS : NSObject <goSeqRefInterface> {
+@protocol VarsI <NSObject>
+@end
+
+@interface VarsS : NSObject <goSeqRefInterface, VarsI> {
 }
 @property(strong, readonly) id _ref;
 
-- (id)initWithRef:(id)ref;
-@end
-
-@protocol VarsI <NSObject>
+- (instancetype)initWithRef:(id)ref;
+- (instancetype)init;
 @end
 
 @interface Vars : NSObject

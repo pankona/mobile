@@ -15,11 +15,16 @@
 @protocol StructsI;
 @class StructsI;
 
+@protocol StructsI <NSObject>
+- (void)m;
+@end
+
 @interface StructsS : NSObject <goSeqRefInterface> {
 }
 @property(strong, readonly) id _ref;
 
-- (id)initWithRef:(id)ref;
+- (instancetype)initWithRef:(id)ref;
+- (instancetype)init;
 - (double)x;
 - (void)setX:(double)v;
 - (double)y;
@@ -28,17 +33,14 @@
 - (double)sum;
 @end
 
-@interface StructsS2 : NSObject <goSeqRefInterface> {
+@interface StructsS2 : NSObject <goSeqRefInterface, StructsI> {
 }
 @property(strong, readonly) id _ref;
 
-- (id)initWithRef:(id)ref;
+- (instancetype)initWithRef:(id)ref;
+- (instancetype)init;
 - (void)m;
 - (NSString*)string;
-@end
-
-@protocol StructsI <NSObject>
-- (void)m;
 @end
 
 FOUNDATION_EXPORT StructsS* StructsIdentity(StructsS* s);

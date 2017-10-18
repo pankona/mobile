@@ -7,6 +7,7 @@ package bind
 import (
 	"bytes"
 	"fmt"
+	"go/ast"
 	"go/token"
 	"go/types"
 	"io"
@@ -80,6 +81,7 @@ type Generator struct {
 	*Printer
 	Fset   *token.FileSet
 	AllPkg []*types.Package
+	Files  []*ast.File
 	Pkg    *types.Package
 	err    ErrorList
 
@@ -95,6 +97,17 @@ type Generator struct {
 	otherNames []*types.TypeName
 	// allIntf contains interfaces from all bound packages.
 	allIntf []interfaceInfo
+
+	docs pkgDocs
+}
+
+// A pkgDocs maps the name of each exported package-level declaration to its extracted documentation.
+type pkgDocs map[string]*pkgDoc
+
+type pkgDoc struct {
+	doc string
+	// Struct or interface fields and methods.
+	members map[string]string
 }
 
 // pkgPrefix returns a prefix that disambiguates symbol names for binding
@@ -118,6 +131,7 @@ func (g *Generator) Init() {
 	g.pkgPrefix = pkgPrefix(g.Pkg)
 
 	if g.Pkg != nil {
+		g.parseDocs()
 		scope := g.Pkg.Scope()
 		hasExported := false
 		for _, name := range scope.Names() {
@@ -173,6 +187,137 @@ func (g *Generator) Init() {
 			}
 		}
 	}
+}
+
+// parseDocs extracts documentation from a package in a form useful for lookups.
+func (g *Generator) parseDocs() {
+	d := make(pkgDocs)
+	for _, f := range g.Files {
+		for _, decl := range f.Decls {
+			switch decl := decl.(type) {
+			case *ast.GenDecl:
+				for _, spec := range decl.Specs {
+					switch spec := spec.(type) {
+					case *ast.TypeSpec:
+						d.addType(spec, decl.Doc)
+					case *ast.ValueSpec:
+						d.addValue(spec, decl.Doc)
+					}
+				}
+			case *ast.FuncDecl:
+				d.addFunc(decl)
+			}
+		}
+	}
+	g.docs = d
+}
+
+func (d pkgDocs) addValue(t *ast.ValueSpec, outerDoc *ast.CommentGroup) {
+	for _, n := range t.Names {
+		if !ast.IsExported(n.Name) {
+			continue
+		}
+		doc := t.Doc
+		if doc == nil {
+			doc = outerDoc
+		}
+		if doc != nil {
+			d[n.Name] = &pkgDoc{doc: doc.Text()}
+		}
+	}
+}
+
+func (d pkgDocs) addFunc(f *ast.FuncDecl) {
+	doc := f.Doc
+	if doc == nil {
+		return
+	}
+	fn := f.Name.Name
+	if !ast.IsExported(fn) {
+		return
+	}
+	if r := f.Recv; r != nil {
+		// f is a method.
+		n := typeName(r.List[0].Type)
+		pd, exists := d[n]
+		if !exists {
+			pd = &pkgDoc{members: make(map[string]string)}
+			d[n] = pd
+		}
+		pd.members[fn] = doc.Text()
+	} else {
+		// f is a function.
+		d[fn] = &pkgDoc{doc: doc.Text()}
+	}
+}
+
+func (d pkgDocs) addType(t *ast.TypeSpec, outerDoc *ast.CommentGroup) {
+	if !ast.IsExported(t.Name.Name) {
+		return
+	}
+	doc := t.Doc
+	if doc == nil {
+		doc = outerDoc
+	}
+	pd := d[t.Name.Name]
+	pd = &pkgDoc{members: make(map[string]string)}
+	d[t.Name.Name] = pd
+	if doc != nil {
+		pd.doc = doc.Text()
+	}
+	var fields *ast.FieldList
+	switch t := t.Type.(type) {
+	case *ast.StructType:
+		fields = t.Fields
+	case *ast.InterfaceType:
+		fields = t.Methods
+	}
+	if fields != nil {
+		for _, field := range fields.List {
+			if field.Doc != nil {
+				if field.Names == nil {
+					// Anonymous field. Extract name from its type.
+					if n := typeName(field.Type); ast.IsExported(n) {
+						pd.members[n] = field.Doc.Text()
+					}
+				}
+				for _, n := range field.Names {
+					if ast.IsExported(n.Name) {
+						pd.members[n.Name] = field.Doc.Text()
+					}
+				}
+			}
+		}
+	}
+}
+
+// typeName returns the type name T for expressions on the
+// T, *T, **T (etc.) form.
+func typeName(t ast.Expr) string {
+	switch t := t.(type) {
+	case *ast.StarExpr:
+		return typeName(t.X)
+	case *ast.Ident:
+		return t.Name
+	case *ast.SelectorExpr:
+		return t.Sel.Name
+	default:
+		return ""
+	}
+}
+
+func (d *pkgDoc) Doc() string {
+	if d == nil {
+		return ""
+	}
+	return d.doc
+}
+
+func (d *pkgDoc) Member(n string) string {
+	if d == nil {
+		return ""
+	}
+	return d.members[n]
 }
 
 // constructorType returns the type T for a function of the forms:
